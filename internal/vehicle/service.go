@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -131,7 +132,7 @@ func validateCreateRequest(req CreateRequest) error {
 	if strings.TrimSpace(req.LicencePlate) == "" {
 		return fmt.Errorf("%w: licence_plate is required", ErrInvalidInput)
 	}
-	if len([]rune(strings.TrimSpace(req.LicencePlate))) > 20 {
+	if utf8.RuneCountInString(strings.TrimSpace(req.LicencePlate)) > 20 {
 		return fmt.Errorf("%w: licence_plate must be 20 characters or fewer", ErrInvalidInput)
 	}
 	if strings.TrimSpace(req.Brand) == "" {
