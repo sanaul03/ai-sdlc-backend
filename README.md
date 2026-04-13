@@ -7,13 +7,15 @@ REST API backend for the AI SDLC fleet management system, implementing the Fleet
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Environment Configuration](#environment-configuration)
-3. [Database Setup](#database-setup)
-4. [Database Migrations](#database-migrations)
-5. [Running the Application](#running-the-application)
-6. [Running Tests](#running-tests)
-7. [Project Structure](#project-structure)
-8. [API Reference](#api-reference)
+2. [Quick Start](#quick-start)
+3. [Environment Configuration](#environment-configuration)
+4. [Configuring the Database Connection](#configuring-the-database-connection)
+5. [Database Setup](#database-setup)
+6. [Database Migrations](#database-migrations)
+7. [Running the Application](#running-the-application)
+8. [Running Tests](#running-tests)
+9. [Project Structure](#project-structure)
+10. [API Reference](#api-reference)
 
 ---
 
@@ -26,29 +28,32 @@ REST API backend for the AI SDLC fleet management system, implementing the Fleet
 
 ---
 
-## Environment Configuration
+## Quick Start
 
-The application is configured entirely via environment variables. Copy the table below into a `.env` file (the file is already in `.gitignore`) and fill in the values before starting.
-
-```dotenv
-# ── Database ──────────────────────────────────────────────────────────────────
-DB_HOST=localhost        # PostgreSQL host          (default: localhost)
-DB_PORT=5432             # PostgreSQL port          (default: 5432)
-DB_USER=your_db_user     # Database user            (required)
-DB_PASSWORD=your_db_pass # Database password        (required)
-DB_NAME=ai_sdlc          # Database name            (required)
-DB_SSLMODE=disable       # SSL mode                 (default: disable)
-                         # Use 'require' for production
-
-# ── HTTP server ───────────────────────────────────────────────────────────────
-SERVER_PORT=8080         # Port the API listens on  (default: 8080)
-```
-
-Export the variables before running the binary, for example:
+> **Minimum steps to get the API running locally.**
 
 ```bash
-export $(grep -v '^#' .env | xargs)
+# 1. Clone
+git clone https://github.com/sanaul03/ai-sdlc-backend.git
+cd ai-sdlc-backend
+
+# 2. Set the three required environment variables
+export DB_USER=ai_sdlc_user
+export DB_PASSWORD=your_secure_password
+export DB_NAME=ai_sdlc
+
+# 3. Start the API server (migrations run automatically)
+go run ./cmd/api
 ```
+
+The server will be reachable at `http://localhost:8080/api/v1`.
+See [Running the Application](#running-the-application) for the full walkthrough and binary build instructions.
+
+---
+
+## Environment Configuration
+
+The application is configured entirely via environment variables. The table below lists every variable the application reads.
 
 ### Variable Reference
 
@@ -61,6 +66,68 @@ export $(grep -v '^#' .env | xargs)
 | `DB_NAME` | **Yes** | — | PostgreSQL database name |
 | `DB_SSLMODE` | No | `disable` | pgx SSL mode (`disable`, `require`, `verify-full`, …) |
 | `SERVER_PORT` | No | `8080` | TCP port the HTTP server binds to |
+
+See [Configuring the Database Connection](#configuring-the-database-connection) for examples of how to change individual settings.
+
+---
+
+## Configuring the Database Connection
+
+The Go application never hard-codes connection details. It reads them exclusively from environment variables at startup (`internal/config/config.go`) and constructs two connection strings:
+
+| Purpose | Format | Used by |
+|---|---|---|
+| pgxpool (runtime queries) | `host=… port=… user=… password=… dbname=… sslmode=…` | `database.New()` |
+| golang-migrate (schema migrations) | `pgx5://user:pass@host:port/db?sslmode=…` | `runMigrations()` / `cmd/migrate` |
+
+Both strings are built automatically from the same six variables — you never edit Go source code to change the connection.
+
+### Changing the host / port
+
+```bash
+export DB_HOST=db.example.com   # default: localhost
+export DB_PORT=5433             # default: 5432
+```
+
+### Changing the username and password
+
+```bash
+export DB_USER=my_app_user
+export DB_PASSWORD=s3cur3P@ssw0rd
+```
+
+### Changing the database name
+
+```bash
+export DB_NAME=fleet_production
+```
+
+### Enabling SSL (recommended for production)
+
+```bash
+export DB_SSLMODE=require        # or verify-full for strict certificate checking
+```
+
+### Using a `.env` file (local development)
+
+Create a `.env` file in the repository root (it is already listed in `.gitignore`):
+
+```dotenv
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=ai_sdlc_user
+DB_PASSWORD=your_secure_password
+DB_NAME=ai_sdlc
+DB_SSLMODE=disable
+SERVER_PORT=8080
+```
+
+Then load it before running any command:
+
+```bash
+export $(grep -v '^#' .env | xargs)
+go run ./cmd/api
+```
 
 ---
 
