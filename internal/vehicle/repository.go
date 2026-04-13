@@ -137,7 +137,7 @@ func (r *postgresRepository) List(ctx context.Context, filter ListFilter) (Page,
 	}
 	defer rows.Close()
 
-	items := make([]Vehicle, 0, pageSize)
+	items := make([]Vehicle, 0)
 	for rows.Next() {
 		var v Vehicle
 		if err := scanVehicleRow(rows, &v); err != nil {
@@ -268,12 +268,12 @@ func scanVehicleRow(rows pgx.Rows, v *Vehicle) error {
 // setExpiryWarning sets ExpiryWarning=true if insurance or registration
 // expires within 30 days from now.
 func setExpiryWarning(v *Vehicle) {
-threshold := time.Now().UTC().Add(30 * 24 * time.Hour)
-if v.InsuranceExpiryDate != nil && v.InsuranceExpiryDate.Before(threshold) {
-v.ExpiryWarning = true
-return
-}
-if v.RegistrationExpiryDate != nil && v.RegistrationExpiryDate.Before(threshold) {
-v.ExpiryWarning = true
-}
+	threshold := time.Now().UTC().Add(30 * 24 * time.Hour)
+	if v.InsuranceExpiryDate != nil && v.InsuranceExpiryDate.Before(threshold) {
+		v.ExpiryWarning = true
+		return
+	}
+	if v.RegistrationExpiryDate != nil && v.RegistrationExpiryDate.Before(threshold) {
+		v.ExpiryWarning = true
+	}
 }
