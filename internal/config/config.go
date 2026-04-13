@@ -26,11 +26,20 @@ type ServerConfig struct {
 	Port string
 }
 
-// DSN returns the PostgreSQL connection string (DSN) for pgx.
+// DSN returns the PostgreSQL key=value connection string used by pgxpool.
 func (d DatabaseConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.Name, d.SSLMode,
+	)
+}
+
+// MigrateDSN returns the URL-formatted connection string required by
+// golang-migrate's pgx/v5 driver (pgx5://user:pass@host:port/db?sslmode=…).
+func (d DatabaseConfig) MigrateDSN() string {
+	return fmt.Sprintf(
+		"pgx5://%s:%s@%s:%s/%s?sslmode=%s",
+		d.User, d.Password, d.Host, d.Port, d.Name, d.SSLMode,
 	)
 }
 

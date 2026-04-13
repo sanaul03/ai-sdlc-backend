@@ -9,10 +9,11 @@ REST API backend for the AI SDLC fleet management system, implementing the Fleet
 1. [Prerequisites](#prerequisites)
 2. [Environment Configuration](#environment-configuration)
 3. [Database Setup](#database-setup)
-4. [Running the Application](#running-the-application)
-5. [Running Tests](#running-tests)
-6. [Project Structure](#project-structure)
-7. [API Reference](#api-reference)
+4. [Database Migrations](#database-migrations)
+5. [Running the Application](#running-the-application)
+6. [Running Tests](#running-tests)
+7. [Project Structure](#project-structure)
+8. [API Reference](#api-reference)
 
 ---
 
@@ -75,35 +76,65 @@ CREATE USER ai_sdlc_user WITH PASSWORD 'your_secure_password';
 GRANT ALL PRIVILEGES ON DATABASE ai_sdlc TO ai_sdlc_user;
 ```
 
-### 2. Migrations
+---
 
-Database schema migrations are managed with [golang-migrate](https://github.com/golang-migrate/migrate). Migration files live in the `migrations/` directory — **one table per file**, following the naming convention `NNNNNN_<description>.<up|down>.sql`.
+## Database Migrations
+
+Schema migrations are managed with [golang-migrate](https://github.com/golang-migrate/migrate) using raw SQL files in the `migrations/` directory — one table per file, named `NNNNNN_<description>.<up|down>.sql`.
 
 | File | Description |
 |---|---|
 | `000001_create_car_groups_table.up.sql` | Creates the `car_groups` table |
-| `000002_create_vehicles_table.up.sql` | Creates the `vehicles` table with FKs and indices |
+| `000002_create_vehicles_table.up.sql` | Creates the `vehicles` table with FK, indices, and CHECK constraints |
 
-**Migrations run automatically on startup.** The application calls `migrate.Up()` before accepting HTTP requests, so no manual step is required in normal operation.
+### Automatic migrations
 
-#### Manual migration (optional)
+The API server runs `migrate up` automatically before accepting requests, so **no manual migration step is required** for normal operation.
 
-If you need to run or roll back migrations manually, install the CLI:
+### Standalone migration CLI
+
+A dedicated CLI binary at `cmd/migrate` lets you run, roll back, or inspect migrations independently of the API server. Run all commands from the **repository root** so the `migrations/` directory is found.
 
 ```bash
-go install -tags 'pgx5' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+# Build the migration binary
+go build -o bin/migrate ./cmd/migrate
 ```
 
-Then run:
+| Command | Description |
+|---|---|
+| `./bin/migrate up` | Apply all pending migrations |
+| `./bin/migrate down [N]` | Roll back N migrations (default: 1) |
+| `./bin/migrate version` | Print the current schema version |
+| `./bin/migrate force <version>` | Force-set version without running SQL (use after manual fixes) |
 
 ```bash
+# Export environment variables first (see Environment Configuration above)
+export DB_USER=ai_sdlc_user
+export DB_PASSWORD=your_secure_password
+export DB_NAME=ai_sdlc
+
 # Apply all pending migrations
-migrate -database "pgx5://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=$DB_SSLMODE" \
-        -path migrations up
+./bin/migrate up
 
 # Roll back the last migration
-migrate -database "pgx5://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=$DB_SSLMODE" \
-        -path migrations down 1
+./bin/migrate down
+
+# Roll back the last 2 migrations
+./bin/migrate down 2
+
+# Check the current schema version
+./bin/migrate version
+
+# Force-set version to 1 (after a manual schema fix)
+./bin/migrate force 1
+```
+
+You can also run without building first:
+
+```bash
+go run ./cmd/migrate up
+go run ./cmd/migrate down
+go run ./cmd/migrate version
 ```
 
 ---
@@ -117,27 +148,37 @@ migrate -database "pgx5://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmo
 git clone https://github.com/sanaul03/ai-sdlc-backend.git
 cd ai-sdlc-backend
 
-# 2. Install dependencies
+# 2. Install Go module dependencies
 go mod download
 
-# 3. Export environment variables
+# 3. Set required environment variables
 export DB_USER=ai_sdlc_user
 export DB_PASSWORD=your_secure_password
 export DB_NAME=ai_sdlc
-# (set any other variables as needed)
+# Optional overrides (shown with their defaults):
+# export DB_HOST=localhost
+# export DB_PORT=5432
+# export DB_SSLMODE=disable
+# export SERVER_PORT=8080
 
-# 4. Build and run
+# 4. (Optional) Run migrations manually before starting the server
+go run ./cmd/migrate up
+
+# 5. Start the API server
 go run ./cmd/api
 ```
 
-The server will:
-1. Apply any pending database migrations automatically.
-2. Start listening on `http://localhost:$SERVER_PORT` (default `8080`).
+The server automatically applies any pending migrations before accepting requests, so step 4 is only needed if you want to manage migrations separately.
 
-### Build a binary
+### Build binaries
 
 ```bash
-go build -o bin/api ./cmd/api
+# Build both the API server and the migration tool
+go build -o bin/api     ./cmd/api
+go build -o bin/migrate ./cmd/migrate
+
+# Run migrations then start the server
+./bin/migrate up
 ./bin/api
 ```
 
@@ -147,6 +188,8 @@ go build -o bin/api ./cmd/api
 2026/04/13 12:00:00 migrations applied successfully
 2026/04/13 12:00:00 server listening on :8080
 ```
+
+The API is now reachable at `http://localhost:8080/api/v1`.
 
 ---
 
@@ -173,8 +216,10 @@ All tests are pure unit tests (no database connection required).
 ```
 .
 ├── cmd/
-│   └── api/
-│       └── main.go                  # Entry point: config, migrations, HTTP server
+│   ├── api/
+│   │   └── main.go                  # Entry point: config, migrations, HTTP server
+│   └── migrate/
+│       └── main.go                  # Standalone migration CLI (up/down/version/force)
 ├── internal/
 │   ├── config/
 │   │   └── config.go                # Environment variable loading

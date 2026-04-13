@@ -82,14 +82,7 @@ func main() {
 }
 
 func runMigrations(cfg *config.Config) error {
-	// golang-migrate pgx/v5 DSN uses the URL format
-	dsn := fmt.Sprintf("pgx5://%s:%s@%s:%s/%s?sslmode=%s",
-		cfg.Database.User, cfg.Database.Password,
-		cfg.Database.Host, cfg.Database.Port,
-		cfg.Database.Name, cfg.Database.SSLMode,
-	)
-
-	m, err := migrate.New("file://migrations", dsn)
+	m, err := migrate.New("file://migrations", cfg.Database.MigrateDSN())
 	if err != nil {
 		return fmt.Errorf("create migrator: %w", err)
 	}
